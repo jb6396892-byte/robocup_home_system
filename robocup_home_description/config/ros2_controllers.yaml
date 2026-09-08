@@ -1,0 +1,105 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 500
+    use_sim_time: true
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    swerve_ik_controller:
+      type: franka_mobile/SwerveIKController
+    swerve_drive_controller:
+      type: franka_mobile/SwerveDriveController
+    fr3_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    fr3_gripper:
+      type: effort_controllers/GripperActionController
+    fr3_gripper_mirror:
+      type: effort_controllers/GripperActionController
+
+swerve_ik_controller:
+  ros__parameters:
+    prefix: tmrv0_2_
+    wheel_1_link_name: argo_drive_front_link
+    wheel_2_link_name: argo_drive_rear_link
+
+swerve_drive_controller:
+  ros__parameters:
+    command_interface_prefix: swerve_ik_controller/
+    state_interface_prefix: tmrv0_2_
+    wheel_1_link_name: argo_drive_front_link
+    wheel_2_link_name: argo_drive_rear_link
+    odom_frame_id: odom
+    tf_frame_id: odom
+    base_link_frame_id: base_link
+    odom_open_loop: false
+    enable_odom_tf: true
+    enable_odom_nav: true
+    publish_rate: 50
+    cmd_vel_timeout: 0.5
+    odom_pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    odom_twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    linear:
+      x:
+        has_velocity_limits: true
+        max_velocity: 0.50
+        min_velocity: -0.50
+        has_acceleration_limits: true
+        max_acceleration: 0.75
+        min_acceleration: -0.75
+        has_jerk_limits: false
+      y:
+        has_velocity_limits: true
+        max_velocity: 0.50
+        min_velocity: -0.50
+        has_acceleration_limits: true
+        max_acceleration: 0.75
+        min_acceleration: -0.75
+        has_jerk_limits: false
+    angular:
+      z:
+        has_velocity_limits: true
+        max_velocity: 1.20
+        min_velocity: -1.20
+        has_acceleration_limits: true
+        max_acceleration: 1.00
+        min_acceleration: -1.00
+        has_jerk_limits: false
+
+fr3_arm_controller:
+  ros__parameters:
+    joints: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
+    command_interfaces: [effort]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 2.0
+    gains:
+      fr3_joint1: {p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint2: {p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint3: {p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint4: {p: 600.0, d: 30.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint5: {p: 250.0, d: 10.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint6: {p: 150.0, d: 10.0, i: 0.0, i_clamp: 1.0}
+      fr3_joint7: {p: 50.0, d: 0.3, i: 0.0, i_clamp: 1.0}
+
+fr3_gripper:
+  ros__parameters:
+    joint: fr3_finger_joint1
+    action_monitor_rate: 20.0
+    goal_tolerance: 0.005
+    allow_stalling: true
+    stall_velocity_threshold: 0.001
+    stall_timeout: 1.0
+    gains:
+      fr3_finger_joint1: {p: 1000.0, i: 0.0, d: 10.0, i_clamp: 1.0}
+
+fr3_gripper_mirror:
+  ros__parameters:
+    joint: fr3_finger_joint2
+    action_monitor_rate: 20.0
+    goal_tolerance: 0.005
+    allow_stalling: true
+    stall_velocity_threshold: 0.001
+    stall_timeout: 1.0
+    gains:
+      fr3_finger_joint2: {p: 1000.0, i: 0.0, d: 10.0, i_clamp: 1.0}

@@ -1,0 +1,39 @@
+# Internal IDs are the 18 supplied Gazebo model directory names.
+version: 1
+classes:
+  - id: apple
+    aliases: [apple]
+  - id: banana
+    aliases: [banana]
+  - id: beer
+    aliases: [beer, beer_can]
+  - id: bleach_cleanser
+    aliases: [bleach_cleanser, bleach]
+  - id: bowl
+    aliases: [bowl]
+  - id: chips_can
+    aliases: [chips_can, chips]
+  - id: coke_can
+    aliases: [coke_can, coke, coca_cola]
+  - id: cracker_box
+    aliases: [cracker_box, crackers]
+  - id: gelatin_box
+    aliases: [gelatin_box, gelatin]
+  - id: master_chef_can
+    aliases: [master_chef_can, master_chef]
+  - id: mustard_bottle
+    aliases: [mustard_bottle, mustard]
+  - id: pitcher_base
+    aliases: [pitcher_base, pitcher]
+  - id: potted_meat_can
+    aliases: [potted_meat_can, potted_meat]
+  - id: pudding_box
+    aliases: [pudding_box, pudding]
+  - id: sugar_box
+    aliases: [sugar_box, sugar]
+  - id: tomato_soup_can
+    aliases: [tomato_soup_can, tomato_soup]
+  - id: tuna_fish_can
+    aliases: [tuna_fish_can, tuna_fish, tuna]
+  - id: windex_bottle
+    aliases: [windex_bottle, windex]

@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<robot name="robocup_home_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find franka_description)/robots/tmrv0_2/tmrv0_2.xacro"/>
+  <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
+  <xacro:include filename="$(find franka_hardware)/ros2_control/franka_ros2_control_macros.xacro"/>
+
+  <xacro:arg name="use_sim" default="true"/>
+  <xacro:arg name="controller_config" default="$(find robocup_home_description)/config/ros2_controllers.yaml"/>
+
+  <xacro:tmrv0_2 mobile_robot_type="tmrv0_2" reduced_version="false" gazebo="true"/>
+
+  <!-- No connected_to value prevents the upstream macro from redefining base_link. -->
+  <xacro:franka_robot robot_type="fr3" connected_to="" hand="true"
+    ee_id="franka_hand" gazebo="true" no_prefix="false"/>
+  <joint name="mobile_fr3_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="fr3_link0"/>
+    <origin xyz="0 0 0.50" rpy="0 0 0"/>
+  </joint>
+
+  <link name="lidar_link">
+    <visual><geometry><cylinder radius="0.045" length="0.05"/></geometry><material name="black"><color rgba="0.05 0.05 0.05 1"/></material></visual>
+    <collision><geometry><cylinder radius="0.045" length="0.05"/></geometry></collision>
+    <inertial><mass value="0.15"/><inertia ixx="0.00008" ixy="0" ixz="0" iyy="0.00008" iyz="0" izz="0.00015"/></inertial>
+  </link>
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/><child link="lidar_link"/><origin xyz="0.20 0 0.34" rpy="0 0 0"/>
+  </joint>
+
+  <link name="rgbd_camera_link">
+    <visual><geometry><box size="0.07 0.12 0.04"/></geometry><material name="camera_dark"><color rgba="0.08 0.08 0.10 1"/></material></visual>
+    <collision><geometry><box size="0.07 0.12 0.04"/></geometry></collision>
+    <inertial><mass value="0.12"/><inertia ixx="0.00016" ixy="0" ixz="0" iyy="0.00006" iyz="0" izz="0.00017"/></inertial>
+  </link>
+  <joint name="rgbd_camera_joint" type="fixed">
+    <!-- Rear-high mounting keeps the camera clear of the folded FR3 arm. -->
+    <parent link="base_link"/><child link="rgbd_camera_link"/><origin xyz="-0.26 0 1.36" rpy="0 0.65 0"/>
+  </joint>
+  <link name="rgbd_camera_optical_frame"/>
+  <joint name="rgbd_camera_optical_joint" type="fixed">
+    <parent link="rgbd_camera_link"/><child link="rgbd_camera_optical_frame"/><origin xyz="0 0 0" rpy="-${pi/2} 0 -${pi/2}"/>
+  </joint>
+
+  <link name="imu_link">
+    <inertial><mass value="0.02"/><inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/></inertial>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/><child link="imu_link"/><origin xyz="0.26 0 0.20" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <topic>/scan</topic><gz_frame_id>lidar_link</gz_frame_id><update_rate>10</update_rate><always_on>true</always_on><visualize>false</visualize>
+      <lidar><scan><horizontal><samples>720</samples><resolution>1</resolution><min_angle>-${pi}</min_angle><max_angle>${pi}</max_angle></horizontal></scan><range><min>0.08</min><max>20.0</max><resolution>0.01</resolution></range></lidar>
+    </sensor>
+  </gazebo>
+  <gazebo reference="rgbd_camera_link">
+    <sensor name="rgbd_camera" type="rgbd_camera">
+      <topic>/camera</topic><gz_frame_id>rgbd_camera_optical_frame</gz_frame_id><update_rate>15</update_rate><always_on>true</always_on><visualize>false</visualize>
+      <camera><optical_frame_id>rgbd_camera_optical_frame</optical_frame_id><horizontal_fov>1.047</horizontal_fov><image><width>640</width><height>480</height><format>R8G8B8</format></image><clip><near>0.10</near><far>10.0</far></clip></camera>
+    </sensor>
+  </gazebo>
+  <gazebo reference="imu_link">
+    <sensor name="imu" type="imu"><topic>/imu/data</topic><gz_frame_id>imu_link</gz_frame_id><update_rate>100</update_rate><always_on>true</always_on></sensor>
+  </gazebo>
+
+  <ros2_control name="TmrHardware" type="system">
+    <hardware><plugin>gz_ros2_control/GazeboSimSystem</plugin></hardware>
+    <xacro:configure_mobile_drive_joints mobile_robot_type="tmrv0_2"/>
+    <xacro:configure_passive_mobile_base_joints include_spine="0"/>
+    <xacro:cartesian_velocity_io/>
+  </ros2_control>
+
+  <ros2_control name="FrankaHardwareInterface" type="system">
+    <hardware>
+      <plugin>franka_gazebo_hardware/GazeboGravityCompensationSystem</plugin>
+      <param name="robot_type">fr3</param><param name="arm_prefix"></param>
+    </hardware>
+    <xacro:configure_arm_interfaces joint_prefix="fr3" gpio_prefix=""
+      gazebo="1" gazebo_effort="1" hand="1"/>
+    <joint name="fr3_finger_joint2">
+      <command_interface name="position"/><command_interface name="velocity"/><command_interface name="effort"/>
+      <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+      <state_interface name="velocity"/><state_interface name="effort"/>
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(arg controller_config)</parameters>
+    </plugin>
+  </gazebo>
+</robot>
