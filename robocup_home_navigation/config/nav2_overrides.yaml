@@ -1,0 +1,115 @@
+# 这里只覆盖本机器人与 Nav2 默认配置不同的部分。
+# navigation.launch.py 会把它与系统自带 nav2_params.yaml 合并。
+amcl:
+  ros__parameters:
+    base_frame_id: base_link
+    odom_frame_id: odom
+    global_frame_id: map
+    scan_topic: /scan
+    robot_model_type: nav2_amcl::OmniMotionModel
+    set_initial_pose: true
+    always_reset_initial_pose: false
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+    update_min_d: 0.10
+    update_min_a: 0.10
+
+bt_navigator:
+  ros__parameters:
+    odom_topic: /swerve_drive_controller/odom
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 15.0
+    min_x_velocity_threshold: 0.01
+    min_y_velocity_threshold: 0.01
+    min_theta_velocity_threshold: 0.01
+    progress_checker:
+      required_movement_radius: 0.20
+      movement_time_allowance: 30.0
+    general_goal_checker:
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+    FollowPath:
+      min_vel_x: -0.10
+      min_vel_y: -0.15
+      max_vel_x: 0.30
+      max_vel_y: 0.15
+      max_vel_theta: 0.70
+      min_speed_xy: 0.0
+      max_speed_xy: 0.30
+      min_speed_theta: 0.10
+      acc_lim_x: 0.60
+      acc_lim_y: 0.50
+      acc_lim_theta: 1.20
+      decel_lim_x: -0.80
+      decel_lim_y: -0.70
+      decel_lim_theta: -1.50
+      vx_samples: 15
+      vy_samples: 11
+      vtheta_samples: 20
+      sim_time: 1.5
+      trans_stopped_velocity: 0.05
+      RotateToGoal.slowing_factor: 2.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      width: 4
+      height: 4
+      footprint: "[[-0.48, -0.36], [-0.48, 0.36], [0.58, 0.36], [0.58, -0.36]]"
+      plugins: [voxel_layer, inflation_layer]
+      voxel_layer:
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          obstacle_max_range: 4.0
+          raytrace_max_range: 5.0
+          max_obstacle_height: 1.5
+      inflation_layer:
+        inflation_radius: 0.52
+        cost_scaling_factor: 4.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      footprint: "[[-0.48, -0.36], [-0.48, 0.36], [0.58, 0.36], [0.58, -0.36]]"
+      plugins: [static_layer, obstacle_layer, inflation_layer]
+      static_layer:
+        map_subscribe_transient_local: true
+      obstacle_layer:
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          obstacle_max_range: 4.0
+          raytrace_max_range: 5.0
+          max_obstacle_height: 1.5
+      inflation_layer:
+        inflation_radius: 0.52
+        cost_scaling_factor: 4.0
+
+behavior_server:
+  ros__parameters:
+    max_rotational_vel: 0.70
+    min_rotational_vel: 0.20
+    rotational_acc_lim: 1.20
+
+velocity_smoother:
+  ros__parameters:
+    feedback: CLOSED_LOOP
+    odom_topic: /swerve_drive_controller/odom
+    max_velocity: [0.30, 0.15, 0.70]
+    min_velocity: [-0.10, -0.15, -0.70]
+    max_accel: [0.60, 0.50, 1.20]
+    max_decel: [-0.80, -0.70, -1.50]

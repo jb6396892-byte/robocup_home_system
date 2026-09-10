@@ -9,13 +9,14 @@ import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-def _augment_world(world_path: pathlib.Path) -> pathlib.Path:
+def _augment_world(world_path: pathlib.Path, enable_test_contacts: bool) -> pathlib.Path:
     content = world_path.read_text(encoding='utf-8')
     plugins = []
     if 'sensors-system' not in content:
@@ -26,6 +27,9 @@ def _augment_world(world_path: pathlib.Path) -> pathlib.Path:
     if 'imu-system' not in content:
         plugins.append('''
     <plugin filename="ignition-gazebo-imu-system" name="gz::sim::systems::Imu"/>''')
+    if enable_test_contacts and 'contact-system' not in content:
+        plugins.append('''
+    <plugin filename="ignition-gazebo-contact-system" name="gz::sim::systems::Contact"/>''')
     if not plugins:
         return world_path
     match = re.search(r'<world\b[^>]*>', content)
@@ -52,12 +56,13 @@ def _robot_description(description_share: str, controller_config: str) -> str:
 
 
 def _launch_setup(context):
+    mode = LaunchConfiguration('mode').perform(context)
     world = pathlib.Path(LaunchConfiguration('world_path').perform(context)).expanduser()
     if not world.is_absolute():
         raise RuntimeError(f'world_path 必须是绝对路径：{world}')
     if not world.is_file():
         raise RuntimeError(f'world_path 不存在：{world}')
-    world = _augment_world(world)
+    world = _augment_world(world, enable_test_contacts=(mode == 'test'))
 
     description_share = get_package_share_directory('robocup_home_description')
     controller_config = os.path.join(description_share, 'config', 'ros2_controllers.yaml')
@@ -81,9 +86,7 @@ def _launch_setup(context):
     state_publisher = Node(
         package='robot_state_publisher', executable='robot_state_publisher',
         parameters=[{'robot_description': robot_description, 'use_sim_time': True}], output='screen')
-    bridge = Node(
-        package='ros_gz_bridge', executable='parameter_bridge', output='screen',
-        arguments=[
+    bridge_arguments = [
             '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
             '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
@@ -91,7 +94,13 @@ def _launch_setup(context):
             '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
             '/camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
             '/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU',
-        ],
+        ]
+    if mode == 'test':
+        bridge_arguments.append(
+            '/test/base_contacts@ros_gz_interfaces/msg/Contacts[gz.msgs.Contacts')
+    bridge = Node(
+        package='ros_gz_bridge', executable='parameter_bridge', output='screen',
+        arguments=bridge_arguments,
         parameters=[{'use_sim_time': True}])
     create = Node(
         package='ros_gz_sim', executable='create', output='screen',
@@ -104,6 +113,12 @@ def _launch_setup(context):
                    'fr3_arm_controller', 'fr3_gripper', 'fr3_gripper_mirror',
                    '--controller-manager', '/controller_manager', '--timeout', '60'])
     start_controllers = RegisterEventHandler(OnProcessExit(target_action=create, on_exit=[spawner]))
+    test_actions = []
+    if mode == 'test':
+        test_actions.append(Node(
+            package='robocup_home_bringup', executable='test_collision_monitor',
+            parameters=[{'use_sim_time': True}], output='screen',
+            condition=IfCondition(LaunchConfiguration('test_contact_monitor'))))
     return [
         LogInfo(msg=['阶段 1：world=', str(world), ', target_source=', LaunchConfiguration('target_source')]),
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path),
@@ -113,9 +128,11 @@ def _launch_setup(context):
         bridge,
         Node(package='tf2_ros', executable='static_transform_publisher',
              arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
-             parameters=[{'use_sim_time': True}], output='screen'),
+             parameters=[{'use_sim_time': True}], output='screen',
+             condition=IfCondition(LaunchConfiguration('publish_static_map_odom'))),
         Node(package='robocup_home_bringup', executable='twist_stamper',
              parameters=[{'use_sim_time': True}], output='screen'),
+    ] + test_actions + [
         create,
         start_controllers,
     ]
@@ -134,5 +151,11 @@ def generate_launch_description():
         DeclareLaunchArgument('spawn_x', default_value='0.0'),
         DeclareLaunchArgument('spawn_y', default_value='0.0'),
         DeclareLaunchArgument('spawn_z', default_value='0.0'),
+        DeclareLaunchArgument(
+            'publish_static_map_odom', default_value='true',
+            description='仅用于阶段 1 测试；运行 SLAM 或 AMCL 时必须设为 false'),
+        DeclareLaunchArgument(
+            'test_contact_monitor', default_value='false',
+            description='仅测试模式可设 true；competition 模式不会桥接 Gazebo Contact'),
         OpaqueFunction(function=_launch_setup),
     ])

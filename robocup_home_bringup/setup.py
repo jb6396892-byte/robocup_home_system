@@ -25,6 +25,7 @@ setup(
             'controller_spawner = robocup_home_bringup.controller_spawner:main',
             'health_check = robocup_home_bringup.health_check:main',
             'stage1_smoke_test = robocup_home_bringup.stage1_smoke_test:main',
+            'test_collision_monitor = robocup_home_bringup.test_collision_monitor:main',
         ],
     },
 )
