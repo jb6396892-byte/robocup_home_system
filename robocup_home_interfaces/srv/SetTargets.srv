@@ -1,0 +1,5 @@
+string[3] target_names
+---
+bool accepted
+string message
+string[3] target_ids

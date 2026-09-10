@@ -1,4 +1,5 @@
 import argparse
+import os
 import pathlib
 import shutil
 import subprocess
@@ -7,6 +8,7 @@ import time
 
 import rclpy
 import yaml
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from controller_manager_msgs.srv import ListControllers
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -29,32 +31,47 @@ REQUIRED_MESSAGES = {
 
 
 def _print(ok: bool, label: str, detail: str = '') -> None:
-    state = 'PASS' if ok else 'FAIL'
+    state = '通过' if ok else '失败'
     suffix = f' - {detail}' if detail else ''
     print(f'[{state}] {label}{suffix}')
 
 
 def static_checks() -> bool:
     ok = True
+    package_shares = {}
+    for label, package_name in (
+        ('WPR 仿真包', 'wpr_simulation_ros2'),
+        ('Franka 描述包', 'franka_description'),
+        ('比赛启动包', 'robocup_home_bringup'),
+    ):
+        try:
+            package_shares[package_name] = pathlib.Path(get_package_share_directory(package_name))
+            _print(True, label, str(package_shares[package_name]))
+        except PackageNotFoundError:
+            _print(False, label, f'没有找到 ROS 包 {package_name}')
+            ok = False
+
+    wpr_share = package_shares.get('wpr_simulation_ros2')
+    bringup_share = package_shares.get('robocup_home_bringup')
     expected = {
-        'WPR example world': pathlib.Path('/home/smg/wpr_ros2_ws/src/wpr_simulation_ros2/worlds/example.world'),
-        'Franka overlay': pathlib.Path('/home/smg/franka_ros2_ws/install/setup.bash'),
-        'class whitelist': pathlib.Path('/home/smg/robocup_home_ws/src/robocup_home_system/config/object_classes.yaml'),
-        'ROS-aware Python venv': pathlib.Path('/home/smg/robocup_home_ws/.venv/bin/python'),
+        'WPR 示例世界': wpr_share / 'worlds' / 'example.world' if wpr_share else None,
+        '18 类白名单': bringup_share / 'config' / 'object_classes.yaml' if bringup_share else None,
     }
     for name, path in expected.items():
-        exists = path.is_file()
-        _print(exists, name, str(path))
+        exists = path is not None and path.is_file()
+        _print(exists, name, str(path) if path else '依赖包不可用')
         ok &= exists
-    class_file = expected['class whitelist']
-    model_root = pathlib.Path('/home/smg/wpr_ros2_ws/src/wpr_simulation_ros2/models')
-    if class_file.is_file() and model_root.is_dir():
+
+    class_file = expected['18 类白名单']
+    model_root = wpr_share / 'models' if wpr_share else None
+    class_ids = set()
+    if class_file and class_file.is_file() and model_root and model_root.is_dir():
         class_ids = {item['id'] for item in yaml.safe_load(class_file.read_text())['classes']}
         missing_models = sorted(name for name in class_ids if not (model_root / name / 'model.config').is_file())
     else:
-        missing_models = ['model root or class file unavailable']
+        missing_models = ['模型目录或类别表不可用']
     models_ok = not missing_models and len(class_ids) == 18
-    _print(models_ok, '18 competition models', 'missing: ' + ', '.join(missing_models) if missing_models else str(model_root))
+    _print(models_ok, '18 个比赛模型', '缺少：' + ', '.join(missing_models) if missing_models else str(model_root))
     ok &= models_ok
     has_gpu_tool = shutil.which('nvidia-smi') is not None
     if has_gpu_tool:
@@ -64,14 +81,21 @@ def static_checks() -> bool:
         has_gpu_tool = result.returncode == 0
         detail = result.stdout.strip() or result.stderr.strip()
     else:
-        detail = 'driver unavailable; install/reboot still required'
-    _print(has_gpu_tool, 'NVIDIA runtime', detail)
+        detail = '驱动不可用，请安装后重启'
+    _print(has_gpu_tool, 'NVIDIA 驱动', detail)
     if not has_gpu_tool:
         ok = False
     swap_entries = pathlib.Path('/proc/swaps').read_text().splitlines()[1:]
     has_swap = bool(swap_entries)
-    _print(has_swap, 'swap', swap_entries[0].split()[0] if has_swap else 'none active; 16 GB recommended')
+    _print(has_swap, '交换分区', swap_entries[0].split()[0] if has_swap else '未启用，建议配置 16 GB')
     ok &= has_swap
+
+    workspace = pathlib.Path(os.environ.get('ROBOCUP_HOME_WS', pathlib.Path.home() / 'robocup_home_ws'))
+    venv_python = workspace / '.venv' / 'bin' / 'python'
+    if venv_python.is_file():
+        _print(True, '视觉 Python 环境', str(venv_python))
+    else:
+        print(f'[提醒] 视觉 Python 环境尚未建立，阶段 3 再安装：{venv_python}')
     return ok
 
 
@@ -123,7 +147,7 @@ class RuntimeChecker(Node):
             if not missing:
                 break
         topics_ok = not missing
-        _print(topics_ok, 'required ROS messages', 'no data: ' + ', '.join(sorted(missing)) if missing else 'all received')
+        _print(topics_ok, '必要 ROS 话题', '没有数据：' + ', '.join(sorted(missing)) if missing else '全部收到')
 
         transforms = (
             ('map', 'odom'), ('odom', 'base_link'), ('base_link', 'lidar_link'),
@@ -140,10 +164,10 @@ class RuntimeChecker(Node):
             }
         tf_missing = [f'{target}<-{source}' for target, source in sorted(pending_tf)]
         tf_ok = not tf_missing
-        _print(tf_ok, 'TF tree', 'missing: ' + ', '.join(tf_missing) if tf_missing else 'connected')
+        _print(tf_ok, 'TF 树', '缺少：' + ', '.join(tf_missing) if tf_missing else '已连通')
 
         controllers_ok = False
-        detail = 'controller_manager service unavailable'
+        detail = 'controller_manager 服务不可用'
         if self.client.wait_for_service(timeout_sec=2.0):
             future = self.client.call_async(ListControllers.Request())
             rclpy.spin_until_future_complete(self, future, timeout_sec=3.0)
@@ -154,13 +178,13 @@ class RuntimeChecker(Node):
                     'fr3_arm_controller', 'fr3_gripper', 'fr3_gripper_mirror',
                 }
                 controllers_ok = all(states.get(name) == 'active' for name in needed)
-                detail = ', '.join(f'{name}={states.get(name, "missing")}' for name in sorted(needed))
-        _print(controllers_ok, 'controllers', detail)
+                detail = ', '.join(f'{name}={states.get(name, "缺失")}' for name in sorted(needed))
+        _print(controllers_ok, '控制器', detail)
         return topics_ok and tf_ok and controllers_ok
 
 
 def main(args=None):
-    parser = argparse.ArgumentParser(description='Stage 0/1 health check')
+    parser = argparse.ArgumentParser(description='阶段 0/1 健康检查')
     parser.add_argument('--static-only', action='store_true')
     parser.add_argument('--timeout', type=float, default=15.0)
     parsed, ros_args = parser.parse_known_args(args)

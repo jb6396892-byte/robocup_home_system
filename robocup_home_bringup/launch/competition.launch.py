@@ -30,7 +30,7 @@ def _augment_world(world_path: pathlib.Path) -> pathlib.Path:
         return world_path
     match = re.search(r'<world\b[^>]*>', content)
     if match is None:
-        raise RuntimeError(f'No <world> element in {world_path}')
+        raise RuntimeError(f'世界文件中没有 <world> 元素：{world_path}')
     augmented = content[:match.end()] + ''.join(plugins) + content[match.end():]
     digest = hashlib.sha256(augmented.encode()).hexdigest()[:12]
     output = pathlib.Path(tempfile.gettempdir()) / f'robocup_world_{digest}.sdf'
@@ -54,9 +54,9 @@ def _robot_description(description_share: str, controller_config: str) -> str:
 def _launch_setup(context):
     world = pathlib.Path(LaunchConfiguration('world_path').perform(context)).expanduser()
     if not world.is_absolute():
-        raise RuntimeError(f'world_path must be absolute: {world}')
+        raise RuntimeError(f'world_path 必须是绝对路径：{world}')
     if not world.is_file():
-        raise RuntimeError(f'world_path does not exist: {world}')
+        raise RuntimeError(f'world_path 不存在：{world}')
     world = _augment_world(world)
 
     description_share = get_package_share_directory('robocup_home_description')
@@ -99,14 +99,13 @@ def _launch_setup(context):
                    '-x', LaunchConfiguration('spawn_x'), '-y', LaunchConfiguration('spawn_y'),
                    '-z', LaunchConfiguration('spawn_z')])
     spawner = Node(
-        package='controller_manager', executable='spawner', output='screen',
+        package='robocup_home_bringup', executable='controller_spawner', output='screen',
         arguments=['joint_state_broadcaster', 'swerve_ik_controller', 'swerve_drive_controller',
-                   'fr3_arm_controller', 'fr3_gripper', 'fr3_gripper_mirror', '--activate-as-group',
-                   '--controller-manager', '/controller_manager', '--controller-manager-timeout', '60',
-                   '--param-file', controller_config])
+                   'fr3_arm_controller', 'fr3_gripper', 'fr3_gripper_mirror',
+                   '--controller-manager', '/controller_manager', '--timeout', '60'])
     start_controllers = RegisterEventHandler(OnProcessExit(target_action=create, on_exit=[spawner]))
     return [
-        LogInfo(msg=['Stage 1: world=', str(world), ', target_source=', LaunchConfiguration('target_source')]),
+        LogInfo(msg=['阶段 1：world=', str(world), ', target_source=', LaunchConfiguration('target_source')]),
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path),
         SetEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', resource_path),
         gazebo,
@@ -123,10 +122,11 @@ def _launch_setup(context):
 
 
 def generate_launch_description():
-    default_world = '/home/smg/wpr_ros2_ws/src/wpr_simulation_ros2/worlds/example.world'
+    default_world = os.path.join(
+        get_package_share_directory('wpr_simulation_ros2'), 'worlds', 'example.world')
     return LaunchDescription([
         DeclareLaunchArgument('world_path', default_value=default_world,
-                              description='Absolute path to any SDF/world file'),
+                              description='任意 SDF/world 文件的绝对路径'),
         DeclareLaunchArgument('target_source', default_value='service',
                               choices=['service', 'voice']),
         DeclareLaunchArgument('mode', default_value='test', choices=['test', 'competition']),

@@ -1,5 +1,5 @@
-# Install only when Stage 3 starts; do not download model weights during setup.
-# Resolve and freeze exact versions after the NVIDIA driver passes nvidia-smi.
+# 阶段 3 开始时再安装，基础环境阶段不要下载模型权重。
+# 确认 nvidia-smi 正常后再解析并锁定准确版本。
 torch>=2.2
 torchvision>=0.17
 ultralytics>=8.4

@@ -1,4 +1,4 @@
-# Internal IDs are the 18 supplied Gazebo model directory names.
+# 内部类别 ID 必须与组委会提供的 18 个 Gazebo 模型目录名完全一致。
 version: 1
 classes:
   - id: apple

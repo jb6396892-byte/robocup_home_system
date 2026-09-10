@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robocup_home_perception</name>
+  <version>0.1.0</version>
+  <description>YOLO 检测、RGB-D 三维定位和多帧去重。</description>
+  <maintainer email="jb6396892-byte@users.noreply.github.com">SEU RoboCup Home Team</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robocup_home_interfaces</exec_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>

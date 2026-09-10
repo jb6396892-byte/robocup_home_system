@@ -15,13 +15,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='smg',
-    maintainer_email='smg@example.com',
-    description='Unified Stage 0/1 bringup and diagnostics.',
+    maintainer='SEU RoboCup Home Team',
+    maintainer_email='jb6396892-byte@users.noreply.github.com',
+    description='阶段 0/1 的统一启动、环境检查和运动测试。',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
             'twist_stamper = robocup_home_bringup.twist_stamper:main',
+            'controller_spawner = robocup_home_bringup.controller_spawner:main',
             'health_check = robocup_home_bringup.health_check:main',
             'stage1_smoke_test = robocup_home_bringup.stage1_smoke_test:main',
         ],

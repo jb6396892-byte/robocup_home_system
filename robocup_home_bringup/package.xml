@@ -2,8 +2,8 @@
 <package format="3">
   <name>robocup_home_bringup</name>
   <version>0.1.0</version>
-  <description>Unified Stage 0/1 bringup and diagnostics.</description>
-  <maintainer email="smg@example.com">smg</maintainer>
+  <description>阶段 0/1 的统一启动、环境检查和运动测试。</description>
+  <maintainer email="jb6396892-byte@users.noreply.github.com">SEU RoboCup Home Team</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>rclpy</exec_depend>

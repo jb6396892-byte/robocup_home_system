@@ -1,29 +1,36 @@
-# Stage 0 and Stage 1 handoff
+# 阶段 0 和阶段 1 交接说明
 
-## Scope
+## 已经完成
 
-Implemented now: a clean overlay workspace, fixed source order, the 18-class ID and
-alias table, arbitrary absolute world paths, one TMR plus one FR3, RGB-D/lidar/IMU,
-one Gazebo ros2_control plugin, the base/arm controllers, Twist adapter, TF, health
-check and a bounded smoke test.
+- 建立独立的比赛总工程，不修改 WPR 和 Franka 上游源码。
+- 固定环境加载顺序：ROS 2 → WPR → Franka → 比赛总工程。
+- 组合 TMR 底盘、单 FR3、夹爪、激光雷达、RGB-D 和 IMU。
+- Gazebo 中只使用一条无冲突的 `ros2_control` 控制链。
+- `/cmd_vel` 可通过适配节点控制 TMR。
+- 支持任意世界绝对路径，不依赖不存在的 `official.world`。
+- NVIDIA 驱动和 16 GiB swap 已验证。
+- 整机稳定运行、底盘运动、机械臂运动、夹爪运动和传感器数据均已通过测试。
 
-PyTorch, Ultralytics and model weights are delayed until Stage 3. They have no caller
-in Stage 0/1 and downloading them now consumes several GB. This is the deliberate
-quota-saving exception. No CUDA Toolkit is needed yet.
+PyTorch、Ultralytics 和模型权重等到阶段 3 再安装。目前没有视觉节点调用它们，提前安装只会占用数 GB 空间。
 
-## Start
+## 启动
 
 ```bash
 source ~/robocup_home_ws/src/robocup_home_system/scripts/setup_env.bash
+ros2 launch robocup_home_bringup competition.launch.py gui:=true
+```
+
+默认启动 WPR 的 `example.world`。如需换世界：
+
+```bash
 ros2 launch robocup_home_bringup competition.launch.py \
-  world_path:=/home/smg/wpr_ros2_ws/src/wpr_simulation_ros2/worlds/example.world \
+  world_path:=/绝对路径/example.world \
   target_source:=service gui:=false
 ```
 
-The launch copies the selected world to `/tmp` only when it needs to add Gazebo's
-sensor and IMU systems. The organizer world is never modified.
+启动文件只会在 `/tmp` 中生成补充传感器插件后的临时世界，不会修改原始世界文件。
 
-In a second terminal:
+另开终端检查：
 
 ```bash
 source ~/robocup_home_ws/src/robocup_home_system/scripts/setup_env.bash
@@ -31,27 +38,10 @@ ros2 run robocup_home_bringup health_check --timeout 20
 ros2 run robocup_home_bringup stage1_smoke_test
 ```
 
-The smoke test drives forward, rotates, stops, moves FR3 joint 1 by 0.2 rad and
-returns to stow. Run it only with free space around the robot.
+冒烟测试依次执行底盘前进、旋转、停止，机械臂关节 1 小幅运动并回到收拢姿态。运行前确认周围没有障碍。
 
-## Stage 0 system actions still requiring a reboot
+## 阶段 2 接手时注意
 
-Install the driver reported by `ubuntu-drivers devices`, create swap only if absent,
-then reboot. These actions require administrator privileges and are intentionally not
-hidden inside the workspace setup:
+阶段 1 暂时发布固定的 `map → odom`。接入 AMCL 后必须关闭这个固定发布器，只允许 AMCL 发布 `map → odom`，否则 TF 会冲突。
 
-```bash
-sudo bash ~/robocup_home_ws/src/robocup_home_system/scripts/finish_stage0_system.bash
-sudo reboot
-```
-
-The script installs whatever `ubuntu-drivers devices` currently marks as
-`recommended` (currently `nvidia-driver-595`) and creates swap only when none is active.
-
-After reboot, `nvidia-smi` and `swapon --show` must pass. Do not install the full CUDA
-Toolkit unless a future CUDA extension actually requires it.
-
-## Temporary TF convention
-
-Stage 1 publishes an identity `map -> odom` transform. Stage 2 must disable that
-publisher when AMCL becomes the authoritative source of `map -> odom`.
+导航期间机械臂必须保持收拢。Nav2 footprint 要包含收拢后的机械臂，临时障碍必须由实时激光进入局部代价地图。

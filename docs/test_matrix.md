@@ -1,27 +1,32 @@
-# Stage 0/1 test matrix
+# 阶段 0/1 测试记录
 
-Date: 2026-09-08
+测试日期：2026-09-08
 
-| Check | Result | Evidence |
+协作结构复测：2026-09-10
+
+| 检查项 | 结果 | 说明 |
 |---|---|---|
-| Overlay build | PASS | `colcon build --symlink-install`: 2 packages finished |
-| Xacro / URDF tree | PASS | `check_urdf`; root is `base_link`, FR3 and all sensors connected |
-| Arbitrary absolute world argument | PASS | WPR `example.world` supplied through `world_path` and copied only to `/tmp` for sensor-system augmentation |
-| Unified controls | PASS | TMR + FR3 are loaded by one Gazebo ros2_control plugin; 6 controllers active together |
-| Sensor data | PASS | Fresh `/clock`, lidar, RGB, depth, CameraInfo, IMU, odom and joint-state messages received |
-| RGB-D field of view | PASS | Rear-high camera pose avoids the folded FR3; RGB is non-uniform (0–251) and all 307200 depth pixels are finite (0.172–5.057 m) |
-| Runtime rates | PASS | Headless WPR load: scan 8.3 Hz, RGB 11.8 Hz, depth 11.5 Hz, IMU 86 Hz, odom 42 Hz, joint states 419 Hz |
-| Sensor frame IDs | PASS | `lidar_link`, `rgbd_camera_optical_frame`, `imu_link` |
-| TF graph | PASS | `map -> odom -> base_link -> sensors / fr3_link0 -> fr3_hand_tcp` connected |
-| Base motion | PASS | `/cmd_vel` adapter test: forward, rotate, stop; odometry changed |
-| FR3 motion | PASS | Joint 1 moved to 0.20 rad and returned to stow; both action goals succeeded |
-| Gripper motion | PASS | Both physical finger controllers opened and closed; four action goals succeeded |
-| 10-minute stability | PASS | Final headless run: 23:07:26–23:18:17, no crash, controller loss or sensor interruption |
-| Clean shutdown | PASS | Controllers and both hardware components deactivate cleanly on Ctrl-C |
-| NVIDIA driver | PASS | `nvidia-driver-595-open` 595.91.07; `nvidia-smi` detects the RTX 4060 Laptop GPU with 8188 MiB |
-| 16 GB swap | PASS | `/swapfile` is active with 16 GiB |
-| PyTorch / Ultralytics | DEFERRED | Deliberately postponed to Stage 3 to avoid unnecessary multi-GB downloads and premature version locking |
-| Demo motion visibility | DEFERRED | Current Stage 1 arm motion is intentionally small; enlarge it later for presentation/video clarity |
+| 总工程构建 | 通过 | `colcon build --symlink-install` 成功 |
+| 多人开发结构 | 通过 | 描述、启动、导航、视觉、机械臂、任务编排和接口共 7 个 ROS 包均可构建 |
+| 路径可移植性 | 通过 | 源码中没有个人主目录绝对路径；工作空间路径可用环境变量覆盖 |
+| 公共接口 | 通过 | `SetTargets`、`TrackedObjectArray`、`MissionStatus` 和 `PickPlace` 均可由 ROS 解析 |
+| Xacro / URDF | 通过 | 根节点为 `base_link`，FR3 和传感器全部连通 |
+| 任意世界路径 | 通过 | 可传入绝对路径；只在 `/tmp` 生成补充插件后的副本 |
+| 控制器 | 通过 | TMR 和 FR3 共用一个 Gazebo 控制插件，6 个控制器同时工作 |
+| 慢速启动 | 通过 | 使用项目自己的稳定加载器，所有控制器服务等待 60 秒，避开 Humble spawner 加载阶段固定 10 秒的问题 |
+| 传感器 | 通过 | `/clock`、激光、RGB、深度、CameraInfo、IMU、里程计和关节状态都有数据 |
+| RGB-D 视野 | 通过 | 相机不再与折叠机械臂穿模；RGB 有真实内容，深度 0.172–5.057 m |
+| 数据频率 | 通过 | 激光 8.3 Hz、RGB 11.8 Hz、深度 11.5 Hz、IMU 86 Hz、里程计 42 Hz |
+| 坐标系名称 | 通过 | `lidar_link`、`rgbd_camera_optical_frame`、`imu_link` |
+| TF | 通过 | `map → odom → base_link → 传感器 / FR3 → hand_tcp` 连通 |
+| 底盘运动 | 通过 | 前进、旋转、停止均成功，里程计发生变化 |
+| FR3 运动 | 通过 | 关节 1 运动 0.20 rad 后返回收拢姿态 |
+| 夹爪运动 | 通过 | 两个手指控制器均能打开和闭合 |
+| 10 分钟稳定性 | 通过 | 无崩溃、控制器丢失或传感器中断 |
+| 正常退出 | 通过 | Ctrl-C 后控制器和硬件接口正常停用 |
+| NVIDIA 驱动 | 通过 | `nvidia-driver-595-open` 595.91.07，RTX 4060 Laptop GPU 正常 |
+| 交换分区 | 通过 | `/swapfile` 已启用，容量 16 GiB |
+| PyTorch / Ultralytics | 推迟 | 阶段 3 再安装，避免现在下载数 GB 文件和过早锁版本 |
+| 演示动作幅度 | 待办 | 当前机械臂动作较小，后续录制正式展示时再扩大 |
 
-The identity `map -> odom` transform is a Stage 1 placeholder. Stage 2 localization
-must replace it with AMCL's transform.
+阶段 1 的固定 `map → odom` 只是占位。阶段 2 接入 AMCL 后必须删除固定发布器。

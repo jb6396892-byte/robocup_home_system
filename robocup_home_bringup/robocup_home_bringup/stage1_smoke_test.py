@@ -31,7 +31,7 @@ class SmokeTest(Node):
 
     def move_arm(self, positions, seconds: int = 3) -> bool:
         if not self.arm.wait_for_server(timeout_sec=8.0):
-            self.get_logger().error('FR3 trajectory action is unavailable')
+            self.get_logger().error('FR3 轨迹 Action 不可用')
             return False
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = JOINTS
@@ -42,17 +42,17 @@ class SmokeTest(Node):
         send_future = self.arm.send_goal_async(goal)
         rclpy.spin_until_future_complete(self, send_future, timeout_sec=5.0)
         if not send_future.done() or not send_future.result().accepted:
-            self.get_logger().error('FR3 trajectory was rejected')
+            self.get_logger().error('FR3 轨迹被控制器拒绝')
             return False
         result_future = send_future.result().get_result_async()
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=seconds + 8.0)
         if not result_future.done():
-            self.get_logger().error('FR3 trajectory result timed out')
+            self.get_logger().error('等待 FR3 轨迹结果超时')
             return False
         result = result_future.result().result
         if result.error_code != 0:
             self.get_logger().error(
-                f'FR3 trajectory failed: code={result.error_code}, {result.error_string}')
+                f'FR3 轨迹失败：code={result.error_code}, {result.error_string}')
             return False
         return True
 
@@ -62,16 +62,16 @@ def main(args=None):
     node = SmokeTest()
     ok = False
     try:
-        node.get_logger().info('Driving forward, rotating, and stopping')
+        node.get_logger().info('底盘依次前进、旋转并停止')
         node.drive(0.12, 0.0, 1.5)
         node.drive(0.0, 0.25, 1.5)
         node.drive(0.0, 0.0, 0.5)
-        node.get_logger().info('Moving FR3 away from and back to stow')
+        node.get_logger().info('FR3 离开收拢姿态后再返回')
         test_pose = STOW.copy()
         test_pose[0] = 0.20
         ok = node.move_arm(test_pose) and node.move_arm(STOW)
         if ok:
-            node.get_logger().info('Stage 1 motion smoke test passed')
+            node.get_logger().info('阶段 1 运动冒烟测试通过')
     finally:
         node.cmd_vel.publish(Twist())
         node.destroy_node()

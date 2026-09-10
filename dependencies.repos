@@ -1,0 +1,5 @@
+repositories:
+  franka_ros2:
+    type: git
+    url: https://github.com/frankarobotics/franka_ros2.git
+    version: 9faaaaf6ad4e4cc177cb93716547cc8ab20c5bd2
