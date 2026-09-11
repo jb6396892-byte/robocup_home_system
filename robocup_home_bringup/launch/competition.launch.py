@@ -18,6 +18,17 @@ from launch_ros.actions import Node
 
 def _augment_world(world_path: pathlib.Path, enable_test_contacts: bool) -> pathlib.Path:
     content = world_path.read_text(encoding='utf-8')
+    # Fortress 在没有 real_time_update_rate 时可能让无界面仿真跑得远快于实时，
+    # 激光时间戳会落后于 TF，继而让 AMCL/Nav2 一直丢弃扫描数据。
+    physics = re.search(r'<physics\b[^>]*>(.*?)</physics>', content, re.DOTALL)
+    physics_patch = ''
+    if physics is not None and '<real_time_update_rate>' not in physics.group(0):
+        step = re.search(r'<max_step_size>\s*([0-9.eE+-]+)\s*</max_step_size>', physics.group(0))
+        update_rate = round(1.0 / float(step.group(1))) if step else 1000
+        physics_patch = f'\n      <real_time_update_rate>{update_rate}</real_time_update_rate>'
+        insert_at = content.find('>', physics.start()) + 1
+        content = content[:insert_at] + physics_patch + content[insert_at:]
+
     plugins = []
     if 'sensors-system' not in content:
         plugins.append('''
@@ -30,7 +41,7 @@ def _augment_world(world_path: pathlib.Path, enable_test_contacts: bool) -> path
     if enable_test_contacts and 'contact-system' not in content:
         plugins.append('''
     <plugin filename="ignition-gazebo-contact-system" name="gz::sim::systems::Contact"/>''')
-    if not plugins:
+    if not plugins and not physics_patch:
         return world_path
     match = re.search(r'<world\b[^>]*>', content)
     if match is None:

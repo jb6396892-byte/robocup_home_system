@@ -56,7 +56,7 @@ def _start_nav2(context):
         }.items())
     waiter = Node(
         package='robocup_home_navigation', executable='wait_for_robot',
-        output='screen')
+        parameters=[{'use_sim_time': True}], output='screen')
 
     def launch_nav2_if_ready(event, _context):
         if event.returncode != 0:
@@ -91,6 +91,20 @@ def generate_launch_description():
             'spawn_z': LaunchConfiguration('spawn_z'),
             'publish_static_map_odom': 'false',
         }.items())
+    task_server = Node(
+        package='robocup_home_navigation', executable='stage2_task_server',
+        parameters=[{'use_sim_time': True}], output='screen')
+    preflight = Node(
+        package='robocup_home_navigation', executable='navigation_preflight',
+        output='screen')
+
+    def start_if_clean(event, _context):
+        if event.returncode != 0:
+            return [LogInfo(msg='发现重复仿真实例，本次导航启动已取消')]
+        return [robot, task_server, OpaqueFunction(function=_start_nav2)]
+
+    start_after_preflight = RegisterEventHandler(
+        OnProcessExit(target_action=preflight, on_exit=start_if_clean))
     return LaunchDescription([
         DeclareLaunchArgument(
             'world_path',
@@ -103,9 +117,7 @@ def generate_launch_description():
         DeclareLaunchArgument('spawn_x', default_value='0.0'),
         DeclareLaunchArgument('spawn_y', default_value='0.0'),
         DeclareLaunchArgument('spawn_z', default_value='0.0'),
-        robot,
-        Node(
-            package='robocup_home_navigation', executable='stage2_task_server',
-            parameters=[{'use_sim_time': True}], output='screen'),
-        OpaqueFunction(function=_start_nav2),
+        # 先注册事件，再运行检查节点。只有检查通过才启动整机和 Nav2。
+        start_after_preflight,
+        preflight,
     ])

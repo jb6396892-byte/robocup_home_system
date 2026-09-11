@@ -17,6 +17,9 @@ class RobotReadinessWaiter(Node):
         self.scan_received = False
         self.odom_received = False
         self.odom_tf_received = False
+        self.scan_stamp = None
+        self.odom_stamp = None
+        self.odom_tf_stamp = None
         self.controller_client = self.create_client(
             ListControllers, '/controller_manager/list_controllers')
         self.create_subscription(
@@ -27,11 +30,17 @@ class RobotReadinessWaiter(Node):
         self.create_subscription(
             TFMessage, '/tf', self._on_tf, qos_profile_sensor_data)
 
-    def _on_scan(self, _message):
-        self.scan_received = True
+    @staticmethod
+    def _stamp_seconds(stamp):
+        return stamp.sec + stamp.nanosec / 1e9
 
-    def _on_odom(self, _message):
+    def _on_scan(self, message):
+        self.scan_received = True
+        self.scan_stamp = self._stamp_seconds(message.header.stamp)
+
+    def _on_odom(self, message):
         self.odom_received = True
+        self.odom_stamp = self._stamp_seconds(message.header.stamp)
 
     def _on_tf(self, message):
         for transform in message.transforms:
@@ -39,6 +48,11 @@ class RobotReadinessWaiter(Node):
             child = transform.child_frame_id.lstrip('/')
             if parent == 'odom' and child == 'base_link':
                 self.odom_tf_received = True
+                self.odom_tf_stamp = self._stamp_seconds(transform.header.stamp)
+
+    def timestamps_aligned(self):
+        stamps = (self.scan_stamp, self.odom_stamp, self.odom_tf_stamp)
+        return all(stamp is not None for stamp in stamps) and max(stamps) - min(stamps) <= 0.30
 
     def controllers_ready(self):
         if not self.controller_client.wait_for_service(timeout_sec=0.2):
@@ -56,8 +70,9 @@ class RobotReadinessWaiter(Node):
         while rclpy.ok():
             rclpy.spin_once(self, timeout_sec=0.2)
             controller_ready = self.controllers_ready()
+            timestamps_aligned = self.timestamps_aligned()
             if (controller_ready and self.scan_received and self.odom_received
-                    and self.odom_tf_received):
+                    and self.odom_tf_received and timestamps_aligned):
                 self.get_logger().info('机器人已就绪，现在启动定位和 Nav2')
                 return
             now = time.monotonic()
@@ -65,7 +80,8 @@ class RobotReadinessWaiter(Node):
                 self.get_logger().info(
                     f'等待中：底盘={controller_ready}，激光={self.scan_received}，'
                     f'里程计={self.odom_received}，'
-                    f'odom->base_link={self.odom_tf_received}')
+                    f'odom->base_link={self.odom_tf_received}，'
+                    f'时间戳同步={timestamps_aligned}')
                 last_report = now
 
 
@@ -74,9 +90,12 @@ def main(args=None):
     node = RobotReadinessWaiter()
     try:
         node.wait()
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
