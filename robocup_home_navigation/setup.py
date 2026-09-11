@@ -24,6 +24,7 @@ setup(
         'console_scripts': [
             'go_to_location = robocup_home_navigation.go_to_location:main',
             'stage2_task_server = robocup_home_navigation.stage2_task_server:main',
+            'wait_for_robot = robocup_home_navigation.wait_for_robot:main',
         ],
     },
 )

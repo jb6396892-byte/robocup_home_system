@@ -39,6 +39,7 @@ def main():
     parser.add_argument('--min-y', type=float, default=-4.5)
     parser.add_argument('--max-x', type=float, default=5.5)
     parser.add_argument('--max-y', type=float, default=4.5)
+    parser.add_argument('--laser-height', type=float, default=0.34)
     args = parser.parse_args()
 
     root = ET.parse(args.world).getroot()
@@ -62,10 +63,11 @@ def main():
                     continue
                 sx, sy, sz = [float(value) for value in size.text.split()]
                 collision_pose = compose(link_pose, pose(collision))
-                # 忽略地面装饰；保留墙、桌腿及高于雷达的桌面，给整机留出空间。
+                # 二维 SLAM 只会记录激光平面真正扫到的截面。若把高于雷达的
+                # 桌面也画进地图，实时扫描和静态地图会长期不一致，AMCL 容易漂移。
                 bottom = collision_pose[2] - sz / 2.0
                 top = collision_pose[2] + sz / 2.0
-                if top < 0.10 or bottom > 1.45 or sx * sy < 0.0005:
+                if not bottom <= args.laser_height <= top or sx * sy < 0.0005:
                     continue
                 boxes.append((collision_pose[0], collision_pose[1], collision_pose[5], sx, sy))
 

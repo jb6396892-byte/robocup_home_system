@@ -6,7 +6,11 @@ import tempfile
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction,
+    RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -50,10 +54,24 @@ def _start_nav2(context):
             'use_composition': 'False',
             'use_respawn': 'false',
         }.items())
-    return [
-        LogInfo(msg=['阶段 2：自动定位并启动 Nav2，map=', str(map_file)]),
-        TimerAction(period=8.0, actions=[nav2]),
-    ]
+    waiter = Node(
+        package='robocup_home_navigation', executable='wait_for_robot',
+        output='screen')
+
+    def launch_nav2_if_ready(event, _context):
+        if event.returncode != 0:
+            return [LogInfo(msg='机器人就绪检查异常退出，取消启动 Nav2')]
+        return [
+            LogInfo(msg=['阶段 2：机器人已经就绪，启动 Nav2，map=', str(map_file)]),
+            nav2,
+        ]
+
+    start_after_ready = RegisterEventHandler(
+        OnProcessExit(
+            target_action=waiter,
+            on_exit=launch_nav2_if_ready))
+    # 先注册退出事件，再启动等待节点，避免快速退出时漏掉事件。
+    return [start_after_ready, waiter]
 
 
 def generate_launch_description():
